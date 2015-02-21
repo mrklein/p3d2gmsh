@@ -62,24 +62,40 @@ except AttributeError:
 
 
 class NeutralMapFile(object):
+
+    """NASA's Neutral Map File representation."""
+
+    @staticmethod
+    def skip_comments(fp):
+        """Skip lines starting with #."""
+        while True:
+            pos = fp.tell()
+            try:
+                l = fp.readline()
+                if not l.startswith('#'):
+                    fp.seek(pos)
+                    break
+            except IOError:
+                break
+
     def __init__(self, filename=None):
+        """Parse boundaries from :filename:."""
         self.__boundaries = []
         if filename is not None:
             fp = open(filename, 'r')
             # Skip initial comments
-            for _ in xrange(4):
-                fp.readline()
+            NeutralMapFile.skip_comments(fp)
             # Blocks
             l = fp.readline()
-            l = l[0:-2]
+            if l.endswith('\\'):
+                l = l[0:-2]
             nblocks = int(l)
             fp.readline()
             for _ in xrange(nblocks):
                 fp.readline()
             fp.readline()
             # Middle comments
-            for _ in range(3):
-                fp.readline()
+            NeutralMapFile.skip_comments(fp)
             # Boundaries
             for l in fp:
                 if l.endswith('\\'):
@@ -87,8 +103,9 @@ class NeutralMapFile(object):
                 else:
                     b = l.split()
                 if len(b) > 0:
-                    b[0] = b[0][1:-1]
-                    if b[0] == 'one-to-one':
+                    if b[0][0] in ['\'', '"']:
+                        b[0] = b[0][1:-1]
+                    if b[0].upper() in ['ONE-TO-ONE', 'ONE_TO_ONE']:
                         continue
                     b[1:] = map(int, b[1:7])
                     self.__boundaries.append(tuple(b))
@@ -96,9 +113,11 @@ class NeutralMapFile(object):
 
     @property
     def boundaries(self):
+        """Get boundaries list."""
         return self.__boundaries
 
     def __str__(self):
+        """Convert boundary to string."""
         return 'Neutral map file / {0:d} boundaries'.format(
             len(self.__boundaries))
 
