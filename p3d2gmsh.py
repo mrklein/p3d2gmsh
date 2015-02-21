@@ -40,6 +40,8 @@ from ctypes import CDLL, c_int, byref, c_double
 #
 # Note that the file api may change.
 #
+# Source:
+# http://svn.python.org/projects/ctypes/trunk/ctypeslib/ctypeslib/contrib/pythonhdr.py
 try:
     import ctypes
 
