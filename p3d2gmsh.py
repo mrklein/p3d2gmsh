@@ -46,6 +46,9 @@ try:
     import ctypes
 
     class FILE(ctypes.Structure):
+
+        """stdio FILE representation."""
+
         pass
     FILE_ptr = ctypes.POINTER(FILE)
 
@@ -197,10 +200,10 @@ class P3DfmtFile(object):
         ftmp = c_double()
         self.__coords = []
 
-        for i in xrange(self.__nblocks):
-            idim = idims[i]
-            jdim = jdims[i]
-            kdim = kdims[i]
+        for b in xrange(self.__nblocks):
+            idim = idims[b]
+            jdim = jdims[b]
+            kdim = kdims[b]
             x = np.zeros((idim, jdim, kdim), 'f8')
             y = np.zeros((idim, jdim, kdim), 'f8')
             z = np.zeros((idim, jdim, kdim), 'f8')
@@ -218,6 +221,7 @@ class P3DfmtFile(object):
         fp.close()
 
     def __str__(self):
+        """Convert to string."""
         idims = [x.shape[0] for x, _, _ in self.__coords]
         jdims = [x.shape[1] for x, _, _ in self.__coords]
         kdims = [x.shape[2] for x, _, _ in self.__coords]
@@ -314,17 +318,20 @@ class GmshFile(object):
         else:
             fp = sys.stdout
 
-        self._write_header(fp)
+        GmshFile._write_header(fp)
         self._write_groups(fp)
         self._write_nodes(fp)
         self._write_elements(fp)
 
-    def _write_header(self, out):
+    @staticmethod
+    def _write_header(out):
+        """Write standard Gmsh file header."""
         out.write('$MeshFormat\n')
         out.write('2.2 0 8\n')
         out.write('$EndMeshFormat\n')
 
     def _write_groups(self, out):
+        """Write Gmsh file physical groups."""
         out.write('$PhysicalNames\n')
         out.write('%d\n' % len(self.__groups))
         for grp in self.__groups:
@@ -332,6 +339,7 @@ class GmshFile(object):
         out.write('$EndPhysicalNames\n')
 
     def _write_nodes(self, out):
+        """Write Gmsh file nodes."""
         out.write('$Nodes\n')
         out.write('%d\n' % len(self.__nodes))
         for node in self.__nodes:
@@ -339,6 +347,7 @@ class GmshFile(object):
         out.write('$EndNodes\n')
 
     def _write_elements(self, out):
+        """Write Gmsh file elements."""
         out.write('$Elements\n')
         out.write('%d\n' % len(self.__elements))
         for el in self.__elements:
@@ -363,6 +372,7 @@ class GmshFile(object):
 
     @staticmethod
     def __find_smallest_cell(p2dfmt_file):
+        dx, dy = 0, 0
         for blk in xrange(p2dfmt_file.nblocks):
             x, y = p2dfmt_file.coords[blk]
             idim, jdim = x.shape
@@ -392,6 +402,7 @@ class GmshFile(object):
         return basen + k + dk*j + dk*dj*i
 
     def get_next_element_id(self):
+        """Generate ID of the next element."""
         self.__element_id += 1
         return self.__element_id
 
@@ -410,13 +421,13 @@ class GmshFile(object):
         # Generating 3D elements
         shifts = [
             [0, -1, -1],
-            [0,  0, -1],
-            [0,  0,  0],
-            [0, -1,  0],
+            [0, 0, -1],
+            [0, 0, 0],
+            [0, -1, 0],
             [1, -1, -1],
-            [1,  0, -1],
-            [1,  0,  0],
-            [1, -1,  0],
+            [1, 0, -1],
+            [1, 0, 0],
+            [1, -1, 0],
         ]
 
         for j in xrange(1, jdim):
@@ -541,7 +552,7 @@ def main():
         if not os.path.exists(fn):
             print('Can\'t open {0}. Skipping.'.format(fn))
             continue
-        (name, ext) = os.path.splitext(fn)
+        (name, _) = os.path.splitext(fn)
 
         mapfile = None
         outputfile = None
