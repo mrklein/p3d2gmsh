@@ -92,7 +92,7 @@ class NeutralMapFile(object):
             NeutralMapFile.skip_comments(fp)
             # Blocks
             l = fp.readline()
-            if l.endswith('\\'):
+            if l.endswith('\\\n'):
                 l = l[0:-2]
             nblocks = int(l)
             fp.readline()
@@ -420,24 +420,25 @@ class GmshFile(object):
 
         # Generating 3D elements
         shifts = [
+            [-1, -1, -1],
+            [-1, 0, -1],
+            [-1, 0, 0],
+            [-1, -1, 0],
             [0, -1, -1],
             [0, 0, -1],
             [0, 0, 0],
             [0, -1, 0],
-            [1, -1, -1],
-            [1, 0, -1],
-            [1, 0, 0],
-            [1, -1, 0],
         ]
 
-        for j in xrange(1, jdim):
-            for k in xrange(1, kdim):
-                el_id = self.get_next_element_id()
-                el = [el_id, 5, 2, 1, -1]
-                for s in shifts:
-                    el.append(GmshFile._p3d_node_id(p3dfmt_file, blkn, s[0],
-                                                    j + s[1], k + s[2]))
-                self.__elements.append(el)
+        for i in xrange(1, idim):
+            for j in xrange(1, jdim):
+                for k in xrange(1, kdim):
+                    el_id = self.get_next_element_id()
+                    el = [el_id, 5, 2, 1, -1]
+                    for s in shifts:
+                        el.append(GmshFile._p3d_node_id(p3dfmt_file, blkn,
+                                  i + s[0], j + s[1], k + s[2]))
+                    self.__elements.append(el)
 
     def _next_group_id(self):
         return max(self.__groups, key=lambda n: n[1])[1] + 1
