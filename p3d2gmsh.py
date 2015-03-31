@@ -111,6 +111,11 @@ class NeutralMapFile(object):
                     if b[0][0] in ['\'', '"']:
                         b[0] = b[0][1:-1]
                     if b[0].upper() in ['ONE-TO-ONE', 'ONE_TO_ONE']:
+                        # Creating two boundaries for stitching
+                        b1 = ['to-stitch-a'] + map(int, b[1:7])
+                        b2 = ['to-stitch-b'] + map(int, b[7:13])
+                        self.__boundaries.append(tuple(b1))
+                        self.__boundaries.append(tuple(b2))
                         continue
                     b[1:] = map(int, b[1:7])
                     self.__boundaries.append(tuple(b))
