@@ -5,7 +5,7 @@ Convert files from NASA's Plot3D mesh format to Gmsh's MSH.
 
 The MIT License (MIT)
 
-Copyright (c) 2015 Alexey Matveichev
+Copyright (c) 2015-2016 Alexey Matveichev
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -175,7 +175,14 @@ class P3DfmtFile(object):
     def load(self, filename):
         """Load mesh blocks from the given file."""
         if sys.platform == 'darwin':
-            libc = CDLL('libc.dylib')
+            try:
+                libc = CDLL('libc.dylib')
+            except OSError:
+                try:
+                    libc = CDLL('/usr/lib/libc.dylib')
+                except OSError:
+                    print('Can not load libc.dylib')
+                    sys.exit(-1)
         elif sys.platform == 'linux2':
             libc = CDLL('libc.so.6')
         else:
@@ -565,12 +572,12 @@ def main():
         if args.map_file is None:
             mapfile = '{0}.nmf'.format(name)
         else:
-            mapfile = args.map_file
+            mapfile = args.map_file.pop()
 
         if args.output_file is None:
             outputfile = '{0}.msh'.format(name)
         else:
-            outputfile = args.output_file
+            outputfile = args.output_file.pop()
 
         p3d = P3DfmtFile()
         p3d.load(fn)
