@@ -263,6 +263,8 @@ class GmshFile(object):
     # - hexagon (5) for the cells
     # So there will be no constants.
 
+    __DEFAULT_GEOMETRY_GROUP = 1
+
     def __init__(self, nodes=None, elements=None, groups=None,
                  filename=None):
         """Construct from components.
@@ -439,7 +441,7 @@ class GmshFile(object):
             for j in xrange(1, jdim):
                 for k in xrange(1, kdim):
                     el_id = self.get_next_element_id()
-                    el = [el_id, 5, 2, 1, -1]
+                    el = [el_id, 5, 2, 1, GmshFile.__DEFAULT_GEOMETRY_GROUP]
                     for s in shifts:
                         el.append(GmshFile._p3d_node_id(p3dfmt_file, blkn,
                                   i + s[0], j + s[1], k + s[2]))
@@ -471,8 +473,8 @@ class GmshFile(object):
                     n3 = GmshFile._p3d_node_id(p3df, blkn, i + 1, j + 1, 0)
                     n4 = GmshFile._p3d_node_id(p3df, blkn, i, j + 1, 0)
 
-                    self.__elements.append([el_id, 3, 2, gid, -1, n1, n2, n3,
-                                            n4])
+                    self.__elements.append([el_id, 3, 2, gid,
+                        GmshFile.__DEFAULT_GEOMETRY_GROUP, n1, n2, n3, n4])
 
         elif bdry[2] == 2:
             for j in xrange(s2 - 1, e2 - 1):
@@ -483,8 +485,8 @@ class GmshFile(object):
                     n3 = GmshFile._p3d_node_id(p3df, blkn, i + 1, j + 1, kmax)
                     n4 = GmshFile._p3d_node_id(p3df, blkn, i, j + 1, kmax)
 
-                    self.__elements.append([el_id, 3, 2, gid, -1, n1, n2, n3,
-                                            n4])
+                    self.__elements.append([el_id, 3, 2, gid,
+                        GmshFile.__DEFAULT_GEOMETRY_GROUP, n1, n2, n3, n4])
 
         elif bdry[2] == 3:
             for k in xrange(s2 - 1, e2 - 1):
@@ -495,8 +497,8 @@ class GmshFile(object):
                     n3 = GmshFile._p3d_node_id(p3df, blkn, 0, j + 1, k + 1)
                     n4 = GmshFile._p3d_node_id(p3df, blkn, 0, j, k + 1)
 
-                    self.__elements.append([el_id, 3, 2, gid, -1, n1, n2, n3,
-                                            n4])
+                    self.__elements.append([el_id, 3, 2, gid,
+                        GmshFile.__DEFAULT_GEOMETRY_GROUP, n1, n2, n3, n4])
 
         elif bdry[2] == 4:
             for k in xrange(s2 - 1, e2 - 1):
@@ -507,8 +509,8 @@ class GmshFile(object):
                     n3 = GmshFile._p3d_node_id(p3df, blkn, imax, j + 1, k + 1)
                     n4 = GmshFile._p3d_node_id(p3df, blkn, imax, j, k + 1)
 
-                    self.__elements.append([el_id, 3, 2, gid, -1, n1, n2, n3,
-                                            n4])
+                    self.__elements.append([el_id, 3, 2, gid,
+                        GmshFile.__DEFAULT_GEOMETRY_GROUP, n1, n2, n3, n4])
 
         elif bdry[2] == 5:
             for i in xrange(s2 - 1, e2 - 1):
@@ -519,8 +521,8 @@ class GmshFile(object):
                     n3 = GmshFile._p3d_node_id(p3df, blkn, i + 1, 0, k + 1)
                     n4 = GmshFile._p3d_node_id(p3df, blkn, i, 0, k + 1)
 
-                    self.__elements.append([el_id, 3, 2, gid, -1, n1, n2, n3,
-                                            n4])
+                    self.__elements.append([el_id, 3, 2, gid,
+                        GmshFile.__DEFAULT_GEOMETRY_GROUP, n1, n2, n3, n4])
 
         elif bdry[2] == 6:
             for i in xrange(s2 - 1, e2 - 1):
@@ -531,8 +533,8 @@ class GmshFile(object):
                     n3 = GmshFile._p3d_node_id(p3df, blkn, i + 1, jmax, k + 1)
                     n4 = GmshFile._p3d_node_id(p3df, blkn, i, jmax, k + 1)
 
-                    self.__elements.append([el_id, 3, 2, gid, -1, n1, n2, n3,
-                                            n4])
+                    self.__elements.append([el_id, 3, 2, gid,
+                        GmshFile.__DEFAULT_GEOMETRY_GROUP, n1, n2, n3, n4])
 
         else:
             raise ValueError('Unknown block face identifier.')
