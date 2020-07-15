@@ -1,11 +1,10 @@
-#!/usr/bin/env python
-
+#!/usr/bin/env python3
 """
 Convert files from NASA's Plot3D mesh format to Gmsh's MSH.
 
 The MIT License (MIT)
 
-Copyright (c) 2015-2016 Alexey Matveichev
+Copyright (c) 2015-2020 Alexey Matveichev
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -26,50 +25,30 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from __future__ import print_function, division
 import sys
 import argparse
 import os.path
 import numpy as np
-from ctypes import CDLL, c_int, byref, c_double
 
-# File API.
-#
-# A FILE_ptr type is used instead of c_void_p because technically a pointer
-# to structure can have a different size or alignment to a void pointer.
-#
-# Note that the file api may change.
-#
-# Source:
-# http://svn.python.org/projects/ctypes/trunk/ctypeslib/ctypeslib/contrib/pythonhdr.py
-try:
-    import ctypes
 
-    class FILE(ctypes.Structure):
-
-        """stdio FILE representation."""
-
-        pass
-    FILE_ptr = ctypes.POINTER(FILE)
-
-    PyFile_FromFile = ctypes.pythonapi.PyFile_FromFile
-    PyFile_FromFile.restype = ctypes.py_object
-    PyFile_FromFile.argtypes = [FILE_ptr,
-                                ctypes.c_char_p,
-                                ctypes.c_char_p,
-                                ctypes.CFUNCTYPE(ctypes.c_int, FILE_ptr)]
-
-    PyFile_AsFile = ctypes.pythonapi.PyFile_AsFile
-    PyFile_AsFile.restype = FILE_ptr
-    PyFile_AsFile.argtypes = [ctypes.py_object]
-except AttributeError:
-    del FILE_ptr
+def read_chunk(f, t):
+    """Read a whitespace-delimited chunk of a file, returns chunk, converted to a given type."""
+    res = ""
+    while True:
+        try:
+            c = f.read(1)
+            if len(c) == 0:
+                return None
+            if c.isspace() and len(res) > 0:
+                return t(res)
+            if not c.isspace():
+                res += c
+        except EOFError:
+            return None
 
 
 class NeutralMapFile(object):
-
     """NASA's Neutral Map File representation."""
-
     @staticmethod
     def skip_comments(fp):
         """Skip lines starting with #."""
@@ -96,7 +75,7 @@ class NeutralMapFile(object):
                 l = l[0:-2]
             nblocks = int(l)
             fp.readline()
-            for _ in xrange(nblocks):
+            for _ in range(nblocks):
                 fp.readline()
             fp.readline()
             # Middle comments
@@ -112,8 +91,8 @@ class NeutralMapFile(object):
                         b[0] = b[0][1:-1]
                     if b[0].upper() in ['ONE-TO-ONE', 'ONE_TO_ONE']:
                         # Creating two boundaries for stitching
-                        b1 = ['to-stitch-a'] + map(int, b[1:7])
-                        b2 = ['to-stitch-b'] + map(int, b[7:13])
+                        b1 = ['to-stitch-a'] + [int(c) for c in b[1:7]]
+                        b2 = ['to-stitch-b'] + [int(c) for c in b[7:13]]
                         self.__boundaries.append(tuple(b1))
                         self.__boundaries.append(tuple(b2))
                         continue
@@ -133,9 +112,7 @@ class NeutralMapFile(object):
 
 
 class P3DfmtFile(object):
-
     """P3Dfmt file representation."""
-
     def __init__(self, filename=None, **kwargs):
         """Construct from components or load from file."""
         if filename:
@@ -174,45 +151,25 @@ class P3DfmtFile(object):
 
     def load(self, filename):
         """Load mesh blocks from the given file."""
-        if sys.platform == 'darwin':
-            try:
-                libc = CDLL('libc.dylib')
-            except OSError:
-                try:
-                    libc = CDLL('/usr/lib/libc.dylib')
-                except OSError:
-                    print('Can not load libc.dylib')
-                    sys.exit(-1)
-        elif sys.platform == 'linux2':
-            libc = CDLL('libc.so.6')
-        else:
-            raise OSError('Unsupported OS.')
-        fscanf = libc.fscanf
-        tmp = c_int()
         fp = open(filename)
 
         # Reading number of blocks
-        fscanf(PyFile_AsFile(fp), '%d', byref(tmp))
-        self.__nblocks = tmp.value
+        self.__nblocks = read_chunk(fp, int)
 
         # Reading dimensions
         idims = np.zeros(self.__nblocks, 'i')
         jdims = np.zeros(self.__nblocks, 'i')
         kdims = np.zeros(self.__nblocks, 'i')
 
-        for i in xrange(self.__nblocks):
-            fscanf(PyFile_AsFile(fp), '%d', byref(tmp))
-            idims[i] = tmp.value
-            fscanf(PyFile_AsFile(fp), '%d', byref(tmp))
-            jdims[i] = tmp.value
-            fscanf(PyFile_AsFile(fp), '%d', byref(tmp))
-            kdims[i] = tmp.value
+        for i in range(self.__nblocks):
+            idims[i] = read_chunk(fp, int)
+            jdims[i] = read_chunk(fp, int)
+            kdims[i] = read_chunk(fp, int)
 
         # Reading coordinates
-        ftmp = c_double()
         self.__coords = []
 
-        for b in xrange(self.__nblocks):
+        for b in range(self.__nblocks):
             idim = idims[b]
             jdim = jdims[b]
             kdim = kdims[b]
@@ -222,11 +179,10 @@ class P3DfmtFile(object):
 
             coords = [x, y, z]
             for c in coords:
-                for k in xrange(kdim):
-                    for j in xrange(jdim):
-                        for i in xrange(idim):
-                            fscanf(PyFile_AsFile(fp), '%lf', byref(ftmp))
-                            c[i, j, k] = ftmp.value
+                for k in range(kdim):
+                    for j in range(jdim):
+                        for i in range(idim):
+                            c[i, j, k] = read_chunk(fp, float)
 
             self.__coords.append((x, y, z))
 
@@ -247,22 +203,21 @@ class P3DfmtFile(object):
 
     def dump_coords(self):
         """Dump coordinates of the file as a list."""
-        for n in xrange(self.__nblocks):
+        for n in range(self.__nblocks):
             idim = self.__coords[n][0].shape[0]
             jdim = self.__coords[n][0].shape[1]
             kdim = self.__coords[n][0].shape[2]
 
             x, y, z = self.__coords[n]
 
-            for i in xrange(idim):
-                for j in xrange(jdim):
-                    for k in xrange(kdim):
-                        print('%lf %lf %lf' % (x[i, j, k], y[i, j, k],
-                                               z[i, j, k]))
+            for i in range(idim):
+                for j in range(jdim):
+                    for k in range(kdim):
+                        print('%lf %lf %lf' %
+                              (x[i, j, k], y[i, j, k], z[i, j, k]))
 
 
 class GmshFile(object):
-
     """Gmsh file representation."""
 
     # For conversion purposes I need only two types of elements:
@@ -272,8 +227,7 @@ class GmshFile(object):
 
     __DEFAULT_GEOMETRY_GROUP = 1
 
-    def __init__(self, nodes=None, elements=None, groups=None,
-                 filename=None):
+    def __init__(self, nodes=None, elements=None, groups=None, filename=None):
         """Construct from components.
 
         If filename is provided object is loaded from the file.
@@ -378,7 +332,7 @@ class GmshFile(object):
             Neutral map file name, for boundary faces
         """
         self.__groups.append((3, 1, 'mesh'))
-        for blkn in xrange(p3dfmt_file.nblocks):
+        for blkn in range(p3dfmt_file.nblocks):
             self._consume_block(p3dfmt_file, blkn)
 
         for bdry in mapfile.boundaries:
@@ -387,13 +341,13 @@ class GmshFile(object):
     @staticmethod
     def __find_smallest_cell(p2dfmt_file):
         dx, dy = 0, 0
-        for blk in xrange(p2dfmt_file.nblocks):
+        for blk in range(p2dfmt_file.nblocks):
             x, y = p2dfmt_file.coords[blk]
             idim, jdim = x.shape
             dx = x[1, 0] - x[0, 0]
             dy = y[0, 1] - y[0, 0]
-            for i in xrange(1, idim):
-                for j in xrange(1, jdim):
+            for i in range(1, idim):
+                for j in range(1, jdim):
                     dx = min(dx, x[i, j] - x[i - 1, j])
                     dy = min(dy, y[i, j] - y[i, j - 1])
         return min(dx, dy)
@@ -405,15 +359,15 @@ class GmshFile(object):
 
         basen = 1
         if p3dfmt_file.nblocks > 1:
-            for idx in xrange(n):
+            for idx in range(n):
                 x, _, _ = p3dfmt_file.coords[idx]
                 di, dj, dk = x.shape
-                basen += di*dj*dk
+                basen += di * dj * dk
 
         x, _, _ = p3dfmt_file.coords[n]
         _, dj, dk = x.shape
 
-        return basen + k + dk*j + dk*dj*i
+        return basen + k + dk * j + dk * dj * i
 
     def get_next_element_id(self):
         """Generate ID of the next element."""
@@ -425,12 +379,12 @@ class GmshFile(object):
         idim, jdim, kdim = x.shape
 
         # Filling nodes list
-        for i in xrange(idim):
-            for j in xrange(jdim):
-                for k in xrange(kdim):
+        for i in range(idim):
+            for j in range(jdim):
+                for k in range(kdim):
                     node_id = GmshFile._p3d_node_id(p3dfmt_file, blkn, i, j, k)
-                    self.__nodes.append((node_id, x[i, j, k], y[i, j, k],
-                                         z[i, j, k]))
+                    self.__nodes.append(
+                        (node_id, x[i, j, k], y[i, j, k], z[i, j, k]))
 
         # Generating 3D elements
         shifts = [
@@ -444,14 +398,15 @@ class GmshFile(object):
             [0, -1, 0],
         ]
 
-        for i in xrange(1, idim):
-            for j in xrange(1, jdim):
-                for k in xrange(1, kdim):
+        for i in range(1, idim):
+            for j in range(1, jdim):
+                for k in range(1, kdim):
                     el_id = self.get_next_element_id()
                     el = [el_id, 5, 2, 1, GmshFile.__DEFAULT_GEOMETRY_GROUP]
                     for s in shifts:
-                        el.append(GmshFile._p3d_node_id(p3dfmt_file, blkn,
-                                  i + s[0], j + s[1], k + s[2]))
+                        el.append(
+                            GmshFile._p3d_node_id(p3dfmt_file, blkn, i + s[0],
+                                                  j + s[1], k + s[2]))
                     self.__elements.append(el)
 
     def _next_group_id(self):
@@ -472,55 +427,63 @@ class GmshFile(object):
 
         s1, e1, s2, e2 = bdry[3:7]
         if bdry[2] == 1:
-            for j in xrange(s2 - 1, e2 - 1):
-                for i in xrange(s1 - 1, e1 - 1):
+            for j in range(s2 - 1, e2 - 1):
+                for i in range(s1 - 1, e1 - 1):
                     el_id = self.get_next_element_id()
                     n1 = GmshFile._p3d_node_id(p3df, blkn, i, j, 0)
                     n2 = GmshFile._p3d_node_id(p3df, blkn, i + 1, j, 0)
                     n3 = GmshFile._p3d_node_id(p3df, blkn, i + 1, j + 1, 0)
                     n4 = GmshFile._p3d_node_id(p3df, blkn, i, j + 1, 0)
 
-                    self.__elements.append([el_id, 3, 2, gid,
-                        GmshFile.__DEFAULT_GEOMETRY_GROUP, n1, n2, n3, n4])
+                    self.__elements.append([
+                        el_id, 3, 2, gid, GmshFile.__DEFAULT_GEOMETRY_GROUP,
+                        n1, n2, n3, n4
+                    ])
 
         elif bdry[2] == 2:
-            for j in xrange(s2 - 1, e2 - 1):
-                for i in xrange(s1 - 1, e1 - 1):
+            for j in range(s2 - 1, e2 - 1):
+                for i in range(s1 - 1, e1 - 1):
                     el_id = self.get_next_element_id()
                     n1 = GmshFile._p3d_node_id(p3df, blkn, i, j, kmax)
                     n2 = GmshFile._p3d_node_id(p3df, blkn, i + 1, j, kmax)
                     n3 = GmshFile._p3d_node_id(p3df, blkn, i + 1, j + 1, kmax)
                     n4 = GmshFile._p3d_node_id(p3df, blkn, i, j + 1, kmax)
 
-                    self.__elements.append([el_id, 3, 2, gid,
-                        GmshFile.__DEFAULT_GEOMETRY_GROUP, n1, n2, n3, n4])
+                    self.__elements.append([
+                        el_id, 3, 2, gid, GmshFile.__DEFAULT_GEOMETRY_GROUP,
+                        n1, n2, n3, n4
+                    ])
 
         elif bdry[2] == 3:
-            for k in xrange(s2 - 1, e2 - 1):
-                for j in xrange(s1 - 1, e1 - 1):
+            for k in range(s2 - 1, e2 - 1):
+                for j in range(s1 - 1, e1 - 1):
                     el_id = self.get_next_element_id()
                     n1 = GmshFile._p3d_node_id(p3df, blkn, 0, j, k)
                     n2 = GmshFile._p3d_node_id(p3df, blkn, 0, j + 1, k)
                     n3 = GmshFile._p3d_node_id(p3df, blkn, 0, j + 1, k + 1)
                     n4 = GmshFile._p3d_node_id(p3df, blkn, 0, j, k + 1)
 
-                    self.__elements.append([el_id, 3, 2, gid,
-                        GmshFile.__DEFAULT_GEOMETRY_GROUP, n1, n2, n3, n4])
+                    self.__elements.append([
+                        el_id, 3, 2, gid, GmshFile.__DEFAULT_GEOMETRY_GROUP,
+                        n1, n2, n3, n4
+                    ])
 
         elif bdry[2] == 4:
-            for k in xrange(s2 - 1, e2 - 1):
-                for j in xrange(s1 - 1, e1 - 1):
+            for k in range(s2 - 1, e2 - 1):
+                for j in range(s1 - 1, e1 - 1):
                     el_id = self.get_next_element_id()
                     n1 = GmshFile._p3d_node_id(p3df, blkn, imax, j, k)
                     n2 = GmshFile._p3d_node_id(p3df, blkn, imax, j + 1, k)
                     n3 = GmshFile._p3d_node_id(p3df, blkn, imax, j + 1, k + 1)
                     n4 = GmshFile._p3d_node_id(p3df, blkn, imax, j, k + 1)
 
-                    self.__elements.append([el_id, 3, 2, gid,
-                        GmshFile.__DEFAULT_GEOMETRY_GROUP, n1, n2, n3, n4])
+                    self.__elements.append([
+                        el_id, 3, 2, gid, GmshFile.__DEFAULT_GEOMETRY_GROUP,
+                        n1, n2, n3, n4
+                    ])
 
         elif bdry[2] == 5:
-            for i in xrange(s2 - 1, e2 - 1):
+            for i in range(s2 - 1, e2 - 1):
                 for k in range(s1 - 1, e1 - 1):
                     el_id = self.get_next_element_id()
                     n1 = GmshFile._p3d_node_id(p3df, blkn, i, 0, k)
@@ -528,20 +491,24 @@ class GmshFile(object):
                     n3 = GmshFile._p3d_node_id(p3df, blkn, i + 1, 0, k + 1)
                     n4 = GmshFile._p3d_node_id(p3df, blkn, i, 0, k + 1)
 
-                    self.__elements.append([el_id, 3, 2, gid,
-                        GmshFile.__DEFAULT_GEOMETRY_GROUP, n1, n2, n3, n4])
+                    self.__elements.append([
+                        el_id, 3, 2, gid, GmshFile.__DEFAULT_GEOMETRY_GROUP,
+                        n1, n2, n3, n4
+                    ])
 
         elif bdry[2] == 6:
-            for i in xrange(s2 - 1, e2 - 1):
-                for k in xrange(s1 - 1, e1 - 1):
+            for i in range(s2 - 1, e2 - 1):
+                for k in range(s1 - 1, e1 - 1):
                     el_id = self.get_next_element_id()
                     n1 = GmshFile._p3d_node_id(p3df, blkn, i, jmax, k)
                     n2 = GmshFile._p3d_node_id(p3df, blkn, i + 1, jmax, k)
                     n3 = GmshFile._p3d_node_id(p3df, blkn, i + 1, jmax, k + 1)
                     n4 = GmshFile._p3d_node_id(p3df, blkn, i, jmax, k + 1)
 
-                    self.__elements.append([el_id, 3, 2, gid,
-                        GmshFile.__DEFAULT_GEOMETRY_GROUP, n1, n2, n3, n4])
+                    self.__elements.append([
+                        el_id, 3, 2, gid, GmshFile.__DEFAULT_GEOMETRY_GROUP,
+                        n1, n2, n3, n4
+                    ])
 
         else:
             raise ValueError('Unknown block face identifier.')
@@ -554,12 +521,19 @@ def main():
     # --map-file / -m: read boundary description from
 
     parser = argparse.ArgumentParser(description='''\
-        Convert P3Dfmt mesh into Gmsh mesh''', add_help=True)
+        Convert P3Dfmt mesh into Gmsh mesh''',
+                                     add_help=True)
     parser.add_argument('files', nargs='+', help='files to convert')
-    parser.add_argument('-m', '--map-file', nargs=1, help='''\
+    parser.add_argument('-m',
+                        '--map-file',
+                        nargs=1,
+                        help='''\
         Neutral Map File, if omitted script will look for <filename>.nmf
                         file''')
-    parser.add_argument('-o', '--output-file', nargs=1, help='''\
+    parser.add_argument('-o',
+                        '--output-file',
+                        nargs=1,
+                        help='''\
         output file name, if omitted mesh will be written to <filename>.msh''')
     args = parser.parse_args()
 
